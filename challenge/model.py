@@ -92,27 +92,44 @@ class DelayModel:
             or
             pd.DataFrame: features.
         """
+        try:
+            if target_column is not None:
+                # prepare data for training
+                data_ = data.copy()
+                data_["period_day"] = data_["Fecha-I"].apply(self.get_period_day)
+                data_["high_season"] = data_["Fecha-I"].apply(self.is_high_season)
+                data_["min_diff"] = data_.apply(self.get_min_diff, axis=1)
+                data_["delay"] = np.where(
+                    data_["min_diff"] > self.threshold_in_minutes, 1, 0
+                )
+                data_ = data_[
+                    ["OPERA", "MES", "TIPOVUELO", "SIGLADES", "DIANOM", "delay"]
+                ]
 
-        data_ = data.copy()
-        data_["period_day"] = data_["Fecha-I"].apply(self.get_period_day)
-        data_["high_season"] = data_["Fecha-I"].apply(self.is_high_season)
-        data_["min_diff"] = data_.apply(self.get_min_diff, axis=1)
-        data_["delay"] = np.where(data_["min_diff"] > self.threshold_in_minutes, 1, 0)
-        data_ = data_[["OPERA", "MES", "TIPOVUELO", "SIGLADES", "DIANOM", "delay"]]
-
-        features = pd.concat(
-            [
-                pd.get_dummies(data_["OPERA"], prefix="OPERA"),
-                pd.get_dummies(data_["TIPOVUELO"], prefix="TIPOVUELO"),
-                pd.get_dummies(data_["MES"], prefix="MES"),
-            ],
-            axis=1,
-        )
-        if target_column is not None:
-            target = data_[[target_column]]
-            return features[self._feature_cols], target
-
-        return features[self._feature_cols]
+                features = pd.concat(
+                    [
+                        pd.get_dummies(data_["OPERA"], prefix="OPERA"),
+                        pd.get_dummies(data_["TIPOVUELO"], prefix="TIPOVUELO"),
+                        pd.get_dummies(data_["MES"], prefix="MES"),
+                    ],
+                    axis=1,
+                )
+                target = data_[[target_column]]
+                return features[self._feature_cols], target
+            else:
+                # is data for inference
+                data_ = data.copy()
+                features = pd.concat(
+                    [
+                        pd.get_dummies(data_["OPERA"], prefix="OPERA"),
+                        pd.get_dummies(data_["TIPOVUELO"], prefix="TIPOVUELO"),
+                        pd.get_dummies(data_["MES"], prefix="MES"),
+                    ],
+                    axis=1,
+                )
+                return features.reindex(columns=self._feature_cols, fill_value=0)
+        except Exception as e:
+            raise Exception(e)
 
     def fit(self, features: pd.DataFrame, target: pd.DataFrame) -> None:
         """

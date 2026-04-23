@@ -2,7 +2,10 @@
 
 # Definitions  
 
-Because both models have almost the same results (DS Observation), I decided to deploy logistic regression because it is more lightweight compared with XGBoost in terms of training and deployment, uses lighter libraries, and results in lower final memory consumption for the service.
+1) Because both models have almost the same results (DS Observation), I decided to deploy logistic regression because it is more lightweight compared with XGBoost in terms of training and deployment, uses lighter libraries, and results in lower final memory consumption for the service.
+
+2) Minimal API with pydantic model validations to avoid values that were not used for training, also raising error 400 when some of teh conditions was not fulfilled 
+
 
 
 # Bugs detected 
