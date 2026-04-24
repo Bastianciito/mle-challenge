@@ -8,11 +8,9 @@ env:
   REPOSITORY: mle-challenge-latam
 
 on:
-  workflow_run:
-    workflows: ['Continuous Integration']
-    types: [completed]
-    branches: [main, develop]
-
+  push:
+    branches:
+      - main  
 jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
