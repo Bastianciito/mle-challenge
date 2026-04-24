@@ -16,9 +16,8 @@ on:
       - develop
 
 jobs:
-  dockerize:
+  test:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,13 +29,21 @@ jobs:
         run: uv python install
 
       - name: Install the project
-        run: uv sync --locked --all-extras --dev
+        run: uv sync --group test
 
       - name: Run tests
         run: |
           source .venv/bin/activate
           make model-test
           make api-test
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Google Cloud Auth
         uses: google-github-actions/auth@v2
