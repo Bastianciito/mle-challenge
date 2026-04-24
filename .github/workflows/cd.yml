@@ -1,4 +1,4 @@
-name: 'Continuous Integration'
+name: 'Continuous Delivery'
 
 env:
   SERVICE_NAME: mle-challenge-latam-service
@@ -8,13 +8,10 @@ env:
   REPOSITORY: mle-challenge-latam
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-  pull_request:
-    branches:
-      - main
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, develop]
 
 jobs:
   dockerize-and-deploy:
