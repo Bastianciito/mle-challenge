@@ -4,5 +4,5 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY challenge ./challenge
 RUN uv sync --frozen --no-dev
-EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "challenge.api:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8080
+CMD ["uv", "run", "uvicorn", "challenge.api:app", "--host", "0.0.0.0", "--port", "8080"]
