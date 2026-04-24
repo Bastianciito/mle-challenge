@@ -8,12 +8,15 @@ env:
   REPOSITORY: mle-challenge-latam
 
 on:
-  push:
-    branches:
-      - develop
   pull_request:
     branches:
       - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+      - 'release/**'
 
 jobs:
   test:
@@ -54,13 +57,30 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Resolve image tags
+        id: tags
         run: |
-          gcloud auth configure-docker ${{ env.REGISTRY }}
+          IMAGE_URL="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
+          BRANCH="${{ github.ref_name }}"
+          SHA="${{ github.sha }}"
+          if [[ "$BRANCH" == release/* ]]; then
+            VERSION="${BRANCH#release/}"
+            echo "tags=${IMAGE_URL}:${VERSION} ${IMAGE_URL}:${SHA}" >> $GITHUB_OUTPUT
+          else
+            echo "tags=${IMAGE_URL}:latest ${IMAGE_URL}:${SHA}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build and Push Docker Image
         env:
-          IMAGE_URL: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
+          TAGS: ${{ steps.tags.outputs.tags }}
         run: |
-          docker build -t $IMAGE_URL:latest -t $IMAGE_URL:${{ github.sha }} -f Dockerfile .
-          docker push $IMAGE_URL:latest
-          docker push $IMAGE_URL:${{ github.sha }}
+          TAG_ARGS=""
+          for tag in $TAGS; do
+            TAG_ARGS="$TAG_ARGS -t $tag"
+          done
+          docker build $TAG_ARGS -f Dockerfile .
+          for tag in $TAGS; do
+            docker push $tag
+          done

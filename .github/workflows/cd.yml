@@ -8,12 +8,16 @@ env:
   REPOSITORY: mle-challenge-latam
 
 on:
-  push:
+  workflow_run:
+    workflows: ['Continuous Integration']
+    types: [completed]
     branches:
-      - main  
+      - main
+      - 'release/**'
+
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,13 +27,26 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-  
-      - name: Deploy to Cloud Run
-        env:
-          IMAGE_URL: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
+
+      - name: Resolve deploy target
+        id: target
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image $IMAGE_URL:latest \
+          IMAGE_URL="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [[ "$BRANCH" == release/* ]]; then
+            VERSION="${BRANCH#release/}"
+            VERSION_SLUG=$(echo "$VERSION" | tr '.' '-')
+            echo "service=${{ env.SERVICE_NAME }}-${VERSION_SLUG}" >> $GITHUB_OUTPUT
+            echo "image=${IMAGE_URL}:${VERSION}" >> $GITHUB_OUTPUT
+          else
+            echo "service=${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+            echo "image=${IMAGE_URL}:latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ steps.target.outputs.service }} \
+            --image ${{ steps.target.outputs.image }} \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
             --platform managed \
