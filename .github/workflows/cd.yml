@@ -54,6 +54,6 @@ jobs:
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
             --platform managed \
-            --project ${{ env.PROJECT_ID }}
+            --project ${{ env.PROJECT_ID }} \
             --memory 2Gi \
             --cpu 1
