@@ -1,3 +1,7 @@
+
+# MLE Challenge
+
+
 # Definitions
 
 0. `uv` was selected as the package manager.
@@ -133,9 +137,9 @@ The service is deployed to Google Cloud Run across three environments. Each envi
 
 | Environment | URL |
 |---|---|
-| Production | `https://mle-challenge-latam-service-307517027307.us-east1.run.app` |
-| Release (v1.0.0) | `https://mle-challenge-latam-service-v1-0-0-307517027307.us-east1.run.app` |
-| Development | `https://mle-challenge-latam-service-dev-307517027307.us-east1.run.app` |
+| Production | `https://mle-challenge-latam-service-5fxzjlb2hq-ue.a.run.app` |
+| Release (v1.0.0) | `https://mle-challenge-latam-service-v1-0-0-5fxzjlb2hq-ue.a.run.app` |
+| Development | `https://mle-challenge-latam-service-dev-5fxzjlb2hq-ue.a.run.app` |
 
 All environments expose the same endpoints:
 
@@ -147,16 +151,93 @@ All environments expose the same endpoints:
 **Example — health check (production):**
 
 ```bash
-curl https://mle-challenge-latam-service-307517027307.us-east1.run.app/health
+curl https://mle-challenge-latam-service-dev-5fxzjlb2hq-ue.a.run.app/health
 ```
 
 **Example — prediction request (production):**
 
 ```bash
-curl -X POST https://mle-challenge-latam-service-307517027307.us-east1.run.app/predict \
+curl -X POST https://mle-challenge-latam-service-dev-5fxzjlb2hq-ue.a.run.app/predict \
   -H "Content-Type: application/json" \
   -d '{"flights": [{"OPERA": "Aerolineas Argentinas", "TIPOVUELO": "N", "MES": 3}]}'
 ```
+
+---
+
+# Terraform Deployment (GCP)
+
+Infrastructure is managed with Terraform and lives in the [terraform/](../terraform/) directory. The CD pipeline provisions or updates the Cloud Run service on every push to `develop`, `release/**`, or `main` — no manual `gcloud run deploy` commands are needed.
+
+## Resources managed
+
+| Resource | Description |
+|---|---|
+| `google_cloud_run_v2_service` | Cloud Run service running the prediction API |
+| `google_cloud_run_v2_service_iam_member` | IAM binding that makes the service publicly accessible |
+
+## State backend
+
+Remote state is stored in a GCS bucket so every CI run shares the same view of infrastructure:
+
+```hcl
+terraform {
+  backend "gcs" {
+    bucket = "mle-challenge-latam-tfstate"
+    prefix = "mle-challenge"
+  }
+}
+```
+
+Each environment (`develop`, `release/vX.Y.Z`, `main`) uses a distinct state prefix so their resources are tracked independently.
+
+## Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `project_id` | GCP project ID | *(required)* |
+| `region` | GCP region | `us-east1` |
+| `image` | Full Docker image URI injected by CI | *(required)* |
+| `service_name` | Cloud Run service name (varies per branch) | *(required)* |
+
+## How CD wires it together
+
+The deploy job in `.github/workflows/cd.yml` runs after the image is built and pushed:
+
+```
+build-and-push  ──►  deploy
+                      ├─ terraform init   (state prefix = mle-challenge/<service>)
+                      ├─ terraform plan
+                      └─ terraform apply  (auto-approved, vars injected from CI)
+```
+
+Variables `image` and `service_name` are resolved by the `build-and-push` job depending on the branch:
+
+| Branch | `service_name` | `image` tag |
+|---|---|---|
+| `develop` | `…-dev` | commit SHA |
+| `release/vX.Y.Z` | `…-vX-Y-Z` | `vX.Y.Z` |
+| `main` | base service name | commit SHA |
+
+## Running Terraform locally
+
+```bash
+cd terraform
+
+terraform init \
+  -backend-config="prefix=mle-challenge/mle-challenge-latam-service-dev"
+
+terraform plan \
+  -var="project_id=<YOUR_PROJECT_ID>" \
+  -var="image=us-east1-docker.pkg.dev/<YOUR_PROJECT_ID>/mle-challenge-latam/mle-challenge-latam-service:<TAG>" \
+  -var="service_name=mle-challenge-latam-service-dev"
+
+terraform apply -auto-approve \
+  -var="project_id=<YOUR_PROJECT_ID>" \
+  -var="image=us-east1-docker.pkg.dev/<YOUR_PROJECT_ID>/mle-challenge-latam/mle-challenge-latam-service:<TAG>" \
+  -var="service_name=mle-challenge-latam-service-dev"
+```
+
+> Requires Application Default Credentials with sufficient permissions (`roles/run.admin`, `roles/iam.serviceAccountUser`, and read access to the state bucket).
 
 ---
 
