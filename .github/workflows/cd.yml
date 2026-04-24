@@ -14,10 +14,9 @@ on:
     branches: [main, develop]
 
 jobs:
-  dockerize-and-deploy:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
