@@ -3,7 +3,9 @@ name: Deploy to Cloud Run
 env:
   SERVICE_NAME: mle-challenge-latam-service
   PROJECT_ID: project-bastian
-  DOCKER_IMAGE_URL: mle-challenge-latam-service
+  REGION: us-east1
+  REGISTRY: us-east1-docker.pkg.dev
+  REPOSITORY: mle-challenge-latam
 
 on:
   push:
@@ -17,33 +19,39 @@ on:
 jobs:
   dockerize-and-deploy:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Google Cloud Auth
-        uses: 'google-github-actions/auth@v2'
+        uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
-          project_id: ${{ env.PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v2'
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker
         run: |
-          gcloud auth configure-docker us-east1-docker.pkg.dev
+          gcloud auth configure-docker ${{ env.REGISTRY }}
 
       - name: Build and Push Docker Image
+        env:
+          IMAGE_URL: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
         run: |
-          docker build -t ${{ env.DOCKER_IMAGE_URL }}:latest -f Dockerfile .
-          docker push ${{ env.DOCKER_IMAGE_URL }}:latest
+          docker build -t $IMAGE_URL:latest -t $IMAGE_URL:${{ github.sha }} -f Dockerfile .
+          docker push $IMAGE_URL:latest
+          docker push $IMAGE_URL:${{ github.sha }}
 
       - name: Deploy to Cloud Run
+        env:
+          IMAGE_URL: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
         run: |
-          echo SERVICE_NAME $SERVICE_NAME
-          gcloud run deploy $SERVICE_NAME \
-            --image ${{ env.DOCKER_IMAGE_URL }}:latest \
-            --region us-east1 \
-            --allow-unauthenticated
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image $IMAGE_URL:latest \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --platform managed \
+            --project ${{ env.PROJECT_ID }}
