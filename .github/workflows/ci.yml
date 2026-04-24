@@ -29,16 +29,18 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-  
-      - name: Deploy to Cloud Run
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Build and Push Docker Image
         env:
           IMAGE_URL: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image $IMAGE_URL:latest \
-            --region ${{ env.REGION }} \
-            --allow-unauthenticated \
-            --platform managed \
-            --project ${{ env.PROJECT_ID }} \
-            --memory 2Gi \
-            --cpu 1
+          docker build -t $IMAGE_URL:latest -t $IMAGE_URL:${{ github.sha }} -f Dockerfile .
+          docker push $IMAGE_URL:latest
+          docker push $IMAGE_URL:${{ github.sha }}
