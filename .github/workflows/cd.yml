@@ -17,8 +17,9 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
-    if: github.event_name == 'push'
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
+      service: ${{ steps.resolve.outputs.service }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,62 +35,47 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGISTRY }}
 
-      - name: Resolve image tags
-        id: tags
+      - name: Resolve image tag and service name
+        id: resolve
         run: |
-          IMAGE_URL="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
+          BASE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
           BRANCH="${{ github.ref_name }}"
           SHA="${{ github.sha }}"
+
           if [[ "$BRANCH" == release/* ]]; then
             VERSION="${BRANCH#release/}"
-            echo "tags=${IMAGE_URL}:${VERSION} ${IMAGE_URL}:${SHA}" >> $GITHUB_OUTPUT
+            VERSION_SLUG=$(echo "$VERSION" | tr '.' '-')
+            echo "image=${BASE}:${VERSION}" >> $GITHUB_OUTPUT
+            echo "service=${{ env.SERVICE_NAME }}-${VERSION_SLUG}" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "develop" ]]; then
+            echo "image=${BASE}:${SHA}" >> $GITHUB_OUTPUT
+            echo "service=${{ env.SERVICE_NAME }}-dev" >> $GITHUB_OUTPUT
           else
-            echo "tags=${IMAGE_URL}:latest ${IMAGE_URL}:${SHA}" >> $GITHUB_OUTPUT
+            echo "image=${BASE}:${SHA}" >> $GITHUB_OUTPUT
+            echo "service=${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build and Push Docker Image
-        env:
-          TAGS: ${{ steps.tags.outputs.tags }}
+      - name: Build and push Docker image
         run: |
-          TAG_ARGS=""
-          for tag in $TAGS; do
-            TAG_ARGS="$TAG_ARGS -t $tag"
-          done
-          docker build $TAG_ARGS -f Dockerfile .
-          for tag in $TAGS; do
-            docker push $tag
-          done
+          docker build -t ${{ steps.resolve.outputs.image }} -f Dockerfile .
+          docker push ${{ steps.resolve.outputs.image }}
+
   deploy:
     runs-on: ubuntu-latest
     needs: build-and-push
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Google Cloud Auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Resolve deploy target
-        id: target
-        run: |
-          IMAGE_URL="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          if [[ "$BRANCH" == release/* ]]; then
-            VERSION="${BRANCH#release/}"
-            VERSION_SLUG=$(echo "$VERSION" | tr '.' '-')
-            echo "service=${{ env.SERVICE_NAME }}-${VERSION_SLUG}" >> $GITHUB_OUTPUT
-            echo "image=${IMAGE_URL}:${VERSION}" >> $GITHUB_OUTPUT
-          else
-            echo "service=${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
-            echo "image=${IMAGE_URL}:latest" >> $GITHUB_OUTPUT
-          fi
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ steps.target.outputs.service }} \
-            --image ${{ steps.target.outputs.image }} \
+          gcloud run deploy ${{ needs.build-and-push.outputs.service }} \
+            --image ${{ needs.build-and-push.outputs.image }} \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
             --platform managed \
