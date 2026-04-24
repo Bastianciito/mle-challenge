@@ -1,0 +1,70 @@
+
+# Git and version control
+.git
+.gitignore
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+
+# Virtual environments
+venv/
+.env
+*.env
+Pipfile
+Pipfile.lock
+
+# Build and dependency caches
+*.egg-info/
+*.dist-info/
+pip-wheel-metadata/
+site-packages/
+
+# Docker-related files
+.dockerignore
+Dockerfile
+
+# OS and system files
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# Logs and temp files
+logs/
+*.log
+*.out
+*.pid
+*.seed
+nohup.out
+
+# Archives and compressed files
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Documentation files
+README.md
+README.rst
+LICENSE
+CHANGELOG.md
+docs/
+*.pdf
+*.md
+
+# Tests (exclude if not running inside the container)
+tests/
+test_*.py
+*.test.py
+*.ipynb
