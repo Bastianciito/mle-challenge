@@ -15,7 +15,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=400, content={"detail": exc.errors()})
 
 
-_model = DelayModel()
+_model = DelayModel(model_path="/app/artifacts/logistic_regression_to_deploy.joblib")
 
 
 class FlightInput(BaseModel):

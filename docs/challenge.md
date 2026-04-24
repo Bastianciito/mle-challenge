@@ -6,6 +6,10 @@
 
 2) Minimal API with pydantic model validations to avoid values that were not used for training, also raising error 400 when some of teh conditions was not fulfilled 
 
+3) Save model artifact (lightweight model)
+4) Docker image with only necesary libraries -> lightwaight image 
+5) Dockerignore added -> avoid unnecesary file for production 
+
 
 
 # Bugs detected 

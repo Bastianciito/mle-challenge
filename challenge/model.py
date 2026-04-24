@@ -4,15 +4,13 @@ from typing import Tuple, Union, List
 from datetime import datetime
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-import xgboost as xgb
-from sklearn.model_selection import train_test_split
-from sklearn.utils import shuffle
+from joblib import load
 
 
 class DelayModel:
 
-    def __init__(self):
-        self._model = None  # Model should be saved in this attribute.
+    def __init__(self, model_path: str = ""):
+        self._model = None
         self._feature_cols = [
             "OPERA_Latin American Wings",
             "MES_7",
@@ -26,6 +24,17 @@ class DelayModel:
             "OPERA_Copa Air",
         ]
         self.threshold_in_minutes = 15
+        self._load_model(model_path)
+
+    def _load_model(self, model_path: str = ""):
+        import os
+
+        exists_os = os.path.exists(model_path)
+        if exists_os:
+            print("model loaded !")
+            self._model = load(model_path)
+        else:
+            print("there is no model available :c")
 
     def get_period_day(self, date):
         date_time = datetime.strptime(date, "%Y-%m-%d %H:%M:%S").time()
